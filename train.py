@@ -19,15 +19,13 @@ from config import Config
 from loss import PixLoss, ClsLoss
 from dataset import MyData
 from models.birefnet import BiRefNet, BiRefNetC2F
-from utils import Logger, AverageMeter, set_seed, check_state_dict, SimpleMovingAverage
+from utils import Logger, AverageMeter, set_seed, check_state_dict, SimpleMovingAverage, bce_index, dice_index, jaccard_index, ssim_index, pixel_index, is_sample_image
 
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 from torch.distributed import init_process_group, destroy_process_group
 
-# Import metrics from scripts/utils.py
-from scripts.utils import bce_index, dice_index, jaccard_index, ssim_index, pixel_index
 
 # ============== Load start ==============
 init() # colorama init
@@ -874,7 +872,6 @@ class Trainer:
                     file_path = paths if not isinstance(paths, list) else paths[0]
 
                     # Check if this image is in our sample list
-                    from scripts.utils import is_sample_image
                     if is_sample_image(Path(file_path).stem):
                         # On first epoch, log the ground truth
                         if epoch == 1 and config_vars.get('resume_start_with_eval', False) is False:

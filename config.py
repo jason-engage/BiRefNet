@@ -6,8 +6,8 @@ class Config():
     def __init__(self) -> None:
         # PATH settings
         # Make up your file system as: SYS_HOME_DIR/codes/dis/BiRefNet, SYS_HOME_DIR/datasets/dis/xx, SYS_HOME_DIR/weights/xx
-        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][0]   # Default, custom
-        self.data_root_dir = os.path.join(self.sys_home_dir, 'AI/Training')
+        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][1]   # Default, custom
+        self.data_root_dir = os.path.join(self.sys_home_dir, 'data')
 
         # TASK settings
         self.task = ['DIS5K', 'COD', 'HRSOD', '1024px', 'General-2K', 'Matting'][3]
@@ -32,9 +32,9 @@ class Config():
         }[self.task]
 
         # Data settings
-        self.size = (512, 768) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
+        self.size = (1024, 1024) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
         # self.dynamic_size = [None, ((384, 768), (384, 768))][1]    # wid, hei. It might cause errors in using compile.
-        self.dynamic_size = [None, [384, 448, 480, 512, 576, 640, 704, 736, 768]][1]  # List of sizes divisible by 32
+        self.dynamic_size = [None, [480, 512, 640, 736, 768, 800, 864, 896, 960, 992, 1024]][1]  # List of sizes divisible by 32
         self.dynamic_size_batch = 200 # Change the dynamic size every N batches - required to keep it fast enough
 
         # Faster-Training settings
@@ -186,8 +186,8 @@ class Config():
         # These control when to save checkpoints:
         # save_last: save checkpoints during the last N epochs
         # save_step: save every Nth epoch during that period
-        self.save_last = 50  # Save during last 50 epochs
-        self.save_step = 2   # Save every 5 epochs
+        self.save_last = 20  # Save during last 50 epochs
+        self.save_step = 1   # Save every 5 epochs
 
         # Original code that parsed from train.sh - commented out since train.sh was simplified
         # run_sh_file = [f for f in os.listdir('.') if 'train.sh' == f] + [os.path.join('..', f) for f in os.listdir('..') if 'train.sh' == f]
