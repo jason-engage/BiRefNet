@@ -401,10 +401,12 @@ class Trainer:
 
         # Accelerate integration
         if args.use_accelerate:
-            # Don't prepare val_loader - keep it non-distributed so each GPU validates on full dataset
-            self.train_loader, self.model, self.optimizer = accelerator.prepare(
-                self.train_loader, self.model, self.optimizer
-            )
+            if self.val_loader is not None:
+                self.train_loader, self.val_loader, self.model, self.optimizer = accelerator.prepare(
+                    self.train_loader, self.val_loader, self.model, self.optimizer
+                )
+            else:
+                self.train_loader, self.model, self.optimizer = accelerator.prepare(self.train_loader, self.model, self.optimizer)
 
         # ============== Loss Functions ==============
         if config.out_ref:
@@ -836,10 +838,14 @@ class Trainer:
                     comet_experiment.set_step(current_step)
 
                 # Data preparation
-                # Always move validation data to device manually since val_loader is not prepared by accelerator
-                inputs = batch[0].to(device)
-                gts = batch[1].to(device)
-                paths = batch[2]  # Validation returns paths as 3rd element
+                if args.use_accelerate:
+                    inputs = batch[0]
+                    gts = batch[1]
+                    paths = batch[2]  # Validation returns paths as 3rd element
+                else:
+                    inputs = batch[0].to(device)
+                    gts = batch[1].to(device)
+                    paths = batch[2]  # Validation returns paths as 3rd element
 
                 # Forward pass
                 scaled_preds = self.model(inputs)[-1]
