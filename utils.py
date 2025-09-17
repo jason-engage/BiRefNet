@@ -98,3 +98,16 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
+
+
+class SimpleMovingAverage:
+    """Simple moving average for smoothing metrics"""
+    def __init__(self, window_size=10):
+        self.window_size = window_size
+        self.values = []
+
+    def update(self, value):
+        self.values.append(value)
+        if len(self.values) > self.window_size:
+            self.values.pop(0)
+        return sum(self.values) / len(self.values)

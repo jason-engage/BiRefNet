@@ -53,15 +53,16 @@ class MyData(data.Dataset):
         ])
         dataset_root = os.path.join(config.data_root_dir, config.task)
         # datasets can be a list of different datasets for training on combined sets.
+        self.dataset_names = datasets.split('+')  # Store original order
         self.image_paths = []
-        for dataset in datasets.split('+'):
-            image_root = os.path.join(dataset_root, dataset, 'im')
+        for dataset in self.dataset_names:
+            image_root = os.path.join(dataset_root, dataset, 'jpgs')
             self.image_paths += [os.path.join(image_root, p) for p in os.listdir(image_root) if any(p.endswith(ext) for ext in valid_extensions)]
         self.label_paths = []
         for p in self.image_paths:
             for ext in valid_extensions:
-                ## 'im' and 'gt' may need modifying
-                p_gt = p.replace('/im/', '/gt/')[:-(len(p.split('.')[-1])+1)] + ext
+                ## 'jpgs' and 'masks' may need modifying
+                p_gt = p.replace('/jpgs/', '/masks/')[:-(len(p.split('.')[-1])+1)] + ext
                 file_exists = False
                 if os.path.exists(p_gt):
                     self.label_paths.append(p_gt)
@@ -101,32 +102,9 @@ class MyData(data.Dataset):
 
         # loading image and label
         if self.is_train:
-            if config.background_color_synthesis:
-                image.putalpha(label)
-                array_image = np.array(image)
-                array_foreground = array_image[:, :, :3].astype(np.float32)
-                array_mask = (array_image[:, :, 3:] / 255).astype(np.float32)
-                array_background = np.zeros_like(array_foreground)
-                choice = random.random()
-                if choice < 0.4:
-                    # Black/Gray/White backgrounds
-                    array_background[:, :, :] = random.randint(0, 255)
-                elif choice < 0.8:
-                    # Background color that similar to the foreground object. Hard negative samples.
-                    foreground_pixel_number = np.sum(array_mask > 0)
-                    color_foreground_mean = np.mean(array_foreground * array_mask, axis=(0, 1)) * (np.prod(array_foreground.shape[:2]) / foreground_pixel_number)
-                    color_up_or_down = random.choice((-1, 1))
-                    # Up or down for 20% range from 255 or 0, respectively.
-                    color_foreground_mean += (255 - color_foreground_mean if color_up_or_down == 1 else color_foreground_mean) * (random.random() * 0.2) * color_up_or_down
-                    array_background[:, :, :] = color_foreground_mean
-                else:
-                    # Any color
-                    for idx_channel in range(3):
-                        array_background[:, :, idx_channel] = random.randint(0, 255)
-                array_foreground_background = array_foreground * array_mask + array_background * (1 - array_mask)
-                image = Image.fromarray(array_foreground_background.astype(np.uint8))
             image, label = preproc(image, label, preproc_methods=config.preproc_methods)
-        # else:
+        
+		# else:
         #     if _label.shape[0] > 2048 or _label.shape[1] > 2048:
         #         _image = cv2.resize(_image, (2048, 2048), interpolation=cv2.INTER_LINEAR)
         #         _label = cv2.resize(_label, (2048, 2048), interpolation=cv2.INTER_LINEAR)
@@ -143,14 +121,42 @@ class MyData(data.Dataset):
             image, label = self.transform_image(image), self.transform_label(label)
 
         if self.is_train:
-            return image, label, class_label
+            return image, label, class_label, self.label_paths[index]
         else:
             return image, label, self.label_paths[index]
 
     def __len__(self):
         return len(self.image_paths)
 
+    def get_batch_composition(self, paths):
+        """
+        Extract dataset names from paths and count occurrences
 
+        Args:
+            paths: List of label paths from a batch
+
+        Returns:
+            Dictionary with dataset names as keys and counts as values
+        """
+        counts = {}
+
+        for path in paths:
+            # Extract the dataset name from path
+            # Path structure: /path/to/data/TASK_NAME/DATASET_NAME/masks/image.jpg
+            path_parts = path.split('/')
+
+            # Find the dataset name - it's between the task folder and 'masks'/'jpgs'
+            for i, part in enumerate(path_parts):
+                if part == 'masks' or part == 'jpgs':
+                    if i > 0:
+                        dataset_name = path_parts[i - 1]
+                        counts[dataset_name] = counts.get(dataset_name, 0) + 1
+                        break
+
+        return counts
+
+
+# Original custom collate function with dynamic size support - Dynamic size changes every batch (VERY SLOW!)
 def custom_collate_fn(batch):
     if config.dynamic_size:
         dynamic_size = tuple(sorted(config.dynamic_size))
@@ -168,6 +174,110 @@ def custom_collate_fn(batch):
         transforms.Resize(data_size[::-1]),
         transforms.ToTensor(),
     ])
-    for image, label, class_label in batch:
-        new_batch.append((transform_image(image), transform_label(label), class_label))
+    for image, label, class_label, path in batch:
+        new_batch.append((transform_image(image), transform_label(label), class_label, path))
     return data._utils.collate.default_collate(new_batch)
+
+
+
+# Modified custom collate function with dynamic size support (size changes every N batches)
+def custom_collate_resize_fn(batch):
+    if config.dynamic_size and config.dynamic_size_batch > 0:
+        # Initialize persistent variables if they don't exist
+        if not hasattr(custom_collate_resize_fn, 'batch_counter'):
+            custom_collate_resize_fn.batch_counter = 0
+            custom_collate_resize_fn.current_size = None
+
+        if custom_collate_resize_fn.batch_counter % config.dynamic_size_batch == 0 or custom_collate_resize_fn.current_size is None:
+            # Pick new random width and height from the list
+            chosen_width = random.choice(config.dynamic_size)
+            chosen_height = random.choice(config.dynamic_size)
+            custom_collate_resize_fn.current_size = (chosen_width, chosen_height)
+            print(f"[Dynamic Size] Changing to new size: {custom_collate_resize_fn.current_size} at batch {custom_collate_resize_fn.batch_counter}")
+
+        custom_collate_resize_fn.batch_counter += 1
+        data_size = custom_collate_resize_fn.current_size
+    else:
+        data_size = config.size
+    new_batch = []
+    transform_image = transforms.Compose([
+        transforms.Resize(data_size[::-1]),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
+    transform_label = transforms.Compose([
+        transforms.Resize(data_size[::-1]),
+        transforms.ToTensor(),
+    ])
+    for image, label, class_label, path in batch:
+        new_batch.append((transform_image(image), transform_label(label), class_label, path))
+    return data._utils.collate.default_collate(new_batch)
+
+
+
+# Modified custom collate function with dynamic size support (size changes every N batches) using Tensor resize (should be a bit faster)
+def custom_collate_resize_tensor_fn(batch):
+    import torch.nn.functional as F
+    import time
+
+    # start_time = time.time()
+
+    if config.dynamic_size and config.dynamic_size_batch > 0:
+        # Initialize persistent variables if they don't exist
+        if not hasattr(custom_collate_resize_fn, 'batch_counter'):
+            custom_collate_resize_fn.batch_counter = 0
+            custom_collate_resize_fn.current_size = None
+
+        if custom_collate_resize_fn.batch_counter % config.dynamic_size_batch == 0 or custom_collate_resize_fn.current_size is None:
+            # Pick new random width and height
+            chosen_width = random.choice(config.dynamic_size)
+            chosen_height = random.choice(config.dynamic_size)
+            custom_collate_resize_fn.current_size = (chosen_width, chosen_height)
+            # print(f"[Dynamic Size] Changing to new size: {custom_collate_resize_fn.current_size} at batch {custom_collate_resize_fn.batch_counter}")
+
+        custom_collate_resize_fn.batch_counter += 1
+        data_size = custom_collate_resize_fn.current_size
+    else:
+        data_size = config.size
+
+    new_batch = []
+
+    # First convert PIL to tensors, then resize as tensors
+    to_tensor = transforms.ToTensor()
+    normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+    for image, label, class_label, path in batch:
+        # Convert PIL to tensor first
+        image_tensor = to_tensor(image)
+        label_tensor = to_tensor(label)
+
+        # Resize tensors using interpolate (much faster than PIL resize)
+        # data_size is (width, height), but interpolate expects (height, width)
+        target_size = data_size[::-1]
+
+        # Add batch dimension for interpolate, then remove it
+        image_tensor = F.interpolate(
+            image_tensor.unsqueeze(0),
+            size=target_size,
+            mode='bilinear',
+            align_corners=False
+        ).squeeze(0)
+
+        label_tensor = F.interpolate(
+            label_tensor.unsqueeze(0),
+            size=target_size,
+            mode='bilinear',
+            align_corners=False
+        ).squeeze(0)
+
+        # Apply normalization to image
+        image_tensor = normalize(image_tensor)
+
+        new_batch.append((image_tensor, label_tensor, class_label, path))
+
+    result = data._utils.collate.default_collate(new_batch)
+
+    end_time = time.time()
+    # print(f"Collate function took: {end_time - start_time:.4f} seconds for size {data_size}")
+
+    return result

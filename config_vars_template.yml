@@ -1,0 +1,18 @@
+# Training Configuration
+# resume_weights_path: "/path/to/pretrained/model.pth"
+resume_weights_path: null
+resume_start_with_eval: false
+log_frequency: 20
+eval_each_epoch: 1 # 0 is disabled - otherwise run eval every N epochs
+ckpt_dir: "checkpoints"
+epoch_st: 1
+epochs_end: 200
+fast_forward_scheduler: false
+max_samples: 0 # 0 means use all samples
+
+# Comet ML Configuration (Optional - for experiment tracking)
+# Sign up for free at https://www.comet.com/ to get your API key
+comet_ml_enable: false
+comet_ml_api_key: "YOUR_COMET_API_KEY_HERE"  # Get from https://www.comet.com/api/my/settings
+comet_ml_workspace: "YOUR_WORKSPACE_NAME"     # Your Comet ML workspace
+comet_ml_project_name: "birefnet"

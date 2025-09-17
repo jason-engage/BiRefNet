@@ -6,18 +6,18 @@ class Config():
     def __init__(self) -> None:
         # PATH settings
         # Make up your file system as: SYS_HOME_DIR/codes/dis/BiRefNet, SYS_HOME_DIR/datasets/dis/xx, SYS_HOME_DIR/weights/xx
-        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][1]   # Default, custom
-        self.data_root_dir = os.path.join(self.sys_home_dir, 'datasets/dis')
+        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][0]   # Default, custom
+        self.data_root_dir = os.path.join(self.sys_home_dir, 'AI/Training')
 
         # TASK settings
-        self.task = ['DIS5K', 'COD', 'HRSOD', 'General', 'General-2K', 'Matting'][0]
+        self.task = ['DIS5K', 'COD', 'HRSOD', '1024px', 'General-2K', 'Matting'][3]
         self.testsets = {
             # Benchmarks
             'DIS5K': ','.join(['DIS-VD', 'DIS-TE1', 'DIS-TE2', 'DIS-TE3', 'DIS-TE4'][:1]),
             'COD': ','.join(['CHAMELEON', 'NC4K', 'TE-CAMO', 'TE-COD10K']),
             'HRSOD': ','.join(['DAVIS-S', 'TE-HRSOD', 'TE-UHRSD', 'DUT-OMRON', 'TE-DUTS']),
             # Practical use
-            'General': ','.join(['DIS-VD', 'TE-P3M-500-NP']),
+            '1024px': ','.join(['validation']),
             'General-2K': ','.join(['DIS-VD', 'TE-P3M-500-NP']),
             'Matting': ','.join(['TE-P3M-500-NP', 'TE-AM-2k']),
         }[self.task]
@@ -26,23 +26,24 @@ class Config():
             'DIS5K': ['DIS-TR', 'DIS-TR+DIS-TE1+DIS-TE2+DIS-TE3+DIS-TE4'][0],
             'COD': 'TR-COD10K+TR-CAMO',
             'HRSOD': ['TR-DUTS', 'TR-HRSOD', 'TR-UHRSD', 'TR-DUTS+TR-HRSOD', 'TR-DUTS+TR-UHRSD', 'TR-HRSOD+TR-UHRSD', 'TR-DUTS+TR-HRSOD+TR-UHRSD'][5],
-            'General': datasets_all,
+            '1024px': 'easy+medium+hard+veryhard+hair+perfect',
             'General-2K': datasets_all,
             'Matting': datasets_all,
         }[self.task]
 
         # Data settings
-        self.size = (1024, 1024) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
-        self.dynamic_size = [None, ((512-256, 2048+256), (512-256, 2048+256))][0]    # wid, hei. It might cause errors in using compile.
-        self.background_color_synthesis = False             # whether to use pure bg color to replace the original backgrounds.
+        self.size = (512, 768) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
+        # self.dynamic_size = [None, ((384, 768), (384, 768))][1]    # wid, hei. It might cause errors in using compile.
+        self.dynamic_size = [None, [384, 448, 480, 512, 576, 640, 704, 736, 768]][1]  # List of sizes divisible by 32
+        self.dynamic_size_batch = 200 # Change the dynamic size every N batches - required to keep it fast enough
 
         # Faster-Training settings
         self.mixed_precision = ['no', 'fp16', 'bf16', 'fp8'][1]
-        self.load_all = False and self.dynamic_size is None   # Turn it on/off by your case. It may consume a lot of CPU memory. And for multi-GPU (N), it would cost N times the CPU memory to load the data.
-        self.compile = True                             # 1. Trigger CPU memory leak in some extend, which is an inherent problem of PyTorch.
-                                                        #   Machines with > 70GB CPU memory can run the whole training on DIS5K with default setting.
-                                                        # 2. Higher PyTorch version may fix it: https://github.com/pytorch/pytorch/issues/119607.
-                                                        # 3. But compile in 2.0.1 < Pytorch < 2.5.0 seems to bring no acceleration for training.
+        self.load_all = False and self.dynamic_size is None  	# Turn it on/off by your case. It may consume a lot of CPU memory. And for multi-GPU (N), it would cost N times the CPU memory to load the data.
+        self.compile = False and self.dynamic_size is None    	# 1. Trigger CPU memory leak in some extend, which is an inherent problem of PyTorch.
+                                                        		#   Machines with > 70GB CPU memory can run the whole training on DIS5K with default setting.
+                                                    			# 2. Higher PyTorch version may fix it: https://github.com/pytorch/pytorch/issues/119607.
+                                                    			# 3. But compile in 2.0.1 < Pytorch < 2.5.0 seems to bring no acceleration for training. [2.8.0: Is about 20-25% faster - may reduce model performance?]
         self.precisionHigh = True
 
         # MODEL settings
@@ -57,14 +58,14 @@ class Config():
         self.dec_blk = ['BasicDecBlk', 'ResBlk'][0]
 
         # TRAINING settings
-        self.batch_size = 4
+        self.batch_size = 2
         self.finetune_last_epochs = [
             0,
             {
                 'DIS5K': -40,
                 'COD': -20,
                 'HRSOD': -20,
-                'General': -20,
+                '1024px': -20,
                 'General-2K': -20,
                 'Matting': -10,
             }[self.task]
@@ -107,8 +108,8 @@ class Config():
         ][0]
 
         # TRAINING settings - inactive
-        self.preproc_methods = ['flip', 'enhance', 'rotate', 'pepper', 'crop'][:4 if not self.background_color_synthesis else 1]
-        self.optimizer = ['Adam', 'AdamW'][1]
+        self.preproc_methods = ['flip', 'enhance', 'random_rotate_zoom', 'pepper', 'crop'][:4]
+        self.optimizer = ['Adam', 'AdamW', 'Ranger'][1]
         self.lr_decay_epochs = [1e5]    # Set to negative N to decay the lr in the last N-th epoch.
         self.lr_decay_rate = 0.5
         # Loss
@@ -125,7 +126,7 @@ class Config():
                 'cnt': 5 * 0,
                 'structure': 5 * 0,
             }
-        elif self.task in ['General', 'General-2K']:
+        elif self.task in ['1024px', 'General-2K']:
             self.lambdas_pix_last = {
                 'bce': 30 * 1,
                 'iou': 0.5 * 1,
@@ -180,12 +181,21 @@ class Config():
 
         self.batch_size_valid = 1
         self.rand_seed = 7
-        run_sh_file = [f for f in os.listdir('.') if 'train.sh' == f] + [os.path.join('..', f) for f in os.listdir('..') if 'train.sh' == f]
-        if run_sh_file:
-            with open(run_sh_file[0], 'r') as f:
-                lines = f.readlines()
-                self.save_last = int([l.strip() for l in lines if "'{}')".format(self.task) in l and 'val_last=' in l][0].split('val_last=')[-1].split()[0])
-                self.save_step = int([l.strip() for l in lines if "'{}')".format(self.task) in l and 'step=' in l][0].split('step=')[-1].split()[0])
+
+        # Checkpoint saving configuration (previously parsed from train.sh)
+        # These control when to save checkpoints:
+        # save_last: save checkpoints during the last N epochs
+        # save_step: save every Nth epoch during that period
+        self.save_last = 50  # Save during last 50 epochs
+        self.save_step = 2   # Save every 5 epochs
+
+        # Original code that parsed from train.sh - commented out since train.sh was simplified
+        # run_sh_file = [f for f in os.listdir('.') if 'train.sh' == f] + [os.path.join('..', f) for f in os.listdir('..') if 'train.sh' == f]
+        # if run_sh_file:
+        #     with open(run_sh_file[0], 'r') as f:
+        #         lines = f.readlines()
+        #         self.save_last = int([l.strip() for l in lines if "'{}')".format(self.task) in l and 'val_last=' in l][0].split('val_last=')[-1].split()[0])
+        #         self.save_step = int([l.strip() for l in lines if "'{}')".format(self.task) in l and 'step=' in l][0].split('step=')[-1].split()[0])
 
 
 # Return task for choosing settings in shell scripts.

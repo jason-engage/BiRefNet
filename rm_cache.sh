@@ -6,7 +6,7 @@ rm -r tmp*
 
 # Train
 rm slurm*
-rm -r ckpts
+rm -r ckpt
 rm nohup.out*
 rm nohup.log*
 

@@ -1,4 +1,5 @@
 # Custom
+config_vars.yml  # Contains sensitive API keys - use config_vars_template.yml instead
 comparisons/
 preds-*/
 *.onnx
@@ -10,8 +11,8 @@ predictions/
 *.avi
 e_*
 .vscode
-ckpts/
-preds/
+ckpt
+preds
 evaluation/eval-*
 nohup.*
 tmp*
@@ -149,3 +150,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Enhanced
+pretrained
+config_vars.yml
+.claude
+checkpoints
+scripts

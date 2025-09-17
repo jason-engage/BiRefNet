@@ -111,6 +111,8 @@ def preproc(image, label, preproc_methods=['flip']):
         image, label = random_crop(image, label)
     if 'rotate' in preproc_methods:
         image, label = random_rotate(image, label)
+    if 'rotate_zoom' in preproc_methods:
+        image, label = random_rotate_zoom(image, label)
     if 'enhance' in preproc_methods:
         image = color_enhance(image)
     if 'pepper' in preproc_methods:
@@ -118,8 +120,8 @@ def preproc(image, label, preproc_methods=['flip']):
     return image, label
 
 
-def cv_random_flip(img, label):
-    if random.random() > 0.5:
+def cv_random_flip(img, label, p=0.5):
+    if random.random() < p:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         label = label.transpose(Image.FLIP_LEFT_RIGHT)
     return img, label
@@ -138,24 +140,25 @@ def random_crop(image, label):
     return image.crop(random_region), label.crop(random_region)
 
 
-def random_rotate(image, label, angle=15):
-    mode = Image.BICUBIC
-    if random.random() > 0.8:
+def random_rotate(image, label, p=0.2, angle=15):
+    mode = Image.BICUBIC # Isn't BILINEAR better for aliasing?
+    if random.random() < p:
         random_angle = np.random.randint(-angle, angle)
         image = image.rotate(random_angle, mode)
         label = label.rotate(random_angle, mode)
     return image, label
 
 
-def color_enhance(image):
-    bright_intensity = random.randint(5, 15) / 10.0
-    image = ImageEnhance.Brightness(image).enhance(bright_intensity)
-    contrast_intensity = random.randint(5, 15) / 10.0
-    image = ImageEnhance.Contrast(image).enhance(contrast_intensity)
-    color_intensity = random.randint(0, 20) / 10.0
-    image = ImageEnhance.Color(image).enhance(color_intensity)
-    sharp_intensity = random.randint(0, 30) / 10.0
-    image = ImageEnhance.Sharpness(image).enhance(sharp_intensity)
+def color_enhance(image, p=1):
+    if random.random() < p:
+        bright_intensity = random.randint(5, 15) / 10.0
+        image = ImageEnhance.Brightness(image).enhance(bright_intensity)
+        contrast_intensity = random.randint(5, 15) / 10.0
+        image = ImageEnhance.Contrast(image).enhance(contrast_intensity)
+        color_intensity = random.randint(0, 20) / 10.0
+        image = ImageEnhance.Color(image).enhance(color_intensity)
+        sharp_intensity = random.randint(0, 30) / 10.0
+        image = ImageEnhance.Sharpness(image).enhance(sharp_intensity)
     return image
 
 
@@ -180,3 +183,51 @@ def random_pepper(img, N=0.0015):
         randY = random.randint(0, img.shape[1] - 1)
         img[randX, randY] = random.randint(0, 1) * 255
     return Image.fromarray(img)
+
+
+def random_rotate_zoom(image, label, p=0.2, degrees=[10, 15, 20], zoom_percentages=[20, 30, 40]):
+    """
+    Randomly rotate and zoom in image and label
+
+    Args:
+        image: PIL Image
+        label: PIL Image
+        p: probability of applying transformation
+        degrees: list of rotation angles to choose from
+        zoom_percentages: list of zoom-in percentages (20 means zoom in by 20%)
+    """
+    mode = Image.BILINEAR
+    if random.random() < p:
+        # Choose random angle (positive or negative)
+        angle = random.choice(degrees) * random.choice([-1, 1])
+
+        # Choose random zoom percentage
+        # 20% zoom-in means we crop to 80% of original, then resize back
+        zoom_pct = random.choice(zoom_percentages)
+        crop_factor = (100 - zoom_pct) / 100  # e.g., 20% zoom -> 0.8 crop factor
+
+        # Get original size
+        width, height = image.size
+
+        # First rotate both images
+        image = image.rotate(angle, mode)
+        label = label.rotate(angle, mode)
+
+        # Calculate crop size for zoom effect
+        crop_width = int(width * crop_factor)
+        crop_height = int(height * crop_factor)
+
+        # Calculate crop box (center crop)
+        left = (width - crop_width) // 2
+        top = (height - crop_height) // 2
+        right = left + crop_width
+        bottom = top + crop_height
+
+        # Crop and resize back to original size for zoom effect
+        image = image.crop((left, top, right, bottom))
+        image = image.resize((width, height), mode)
+
+        label = label.crop((left, top, right, bottom))
+        label = label.resize((width, height), mode)
+
+    return image, label
