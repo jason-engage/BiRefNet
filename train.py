@@ -263,22 +263,6 @@ def prepare_train_dataloader(dataset: torch.utils.data.Dataset, batch_size: int,
         )
 
 
-def prepare_val_dataloader(dataset: torch.utils.data.Dataset, batch_size: int):
-    """
-    Prepare validation dataloader - always non-distributed.
-    Each GPU gets the FULL validation dataset.
-    """
-    return torch.utils.data.DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        num_workers=min(config.num_workers, batch_size),
-        pin_memory=True,
-        shuffle=False,  # Never shuffle validation
-        drop_last=False,  # Don't drop last batch for validation
-        collate_fn=None  # No dynamic resizing for validation
-    )
-
-
 def init_data_loaders(to_be_distributed):
     # Prepare datasets
     train_loader = prepare_train_dataloader(
@@ -291,10 +275,10 @@ def init_data_loaders(to_be_distributed):
     # Prepare validation loader if needed
     val_loader = None
     if config_vars.get('eval_each_epoch', 0) > 0 and config.testsets:
-        # Each GPU processes the FULL validation dataset independently
-        val_loader = prepare_val_dataloader(
+        # Validation should NOT be distributed - each GPU processes full dataset
+        val_loader = prepare_train_dataloader(
             MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size, is_train=False),
-            config.batch_size_valid
+            config.batch_size_valid, to_be_distributed=False, is_train=False
         )
         if is_main_process:
             logger.info("{} batches of validation dataloader {} have been created.".format(len(val_loader), config.testsets))
