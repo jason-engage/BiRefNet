@@ -401,12 +401,10 @@ class Trainer:
 
         # Accelerate integration
         if args.use_accelerate:
-            if self.val_loader is not None:
-                self.train_loader, self.val_loader, self.model, self.optimizer = accelerator.prepare(
-                    self.train_loader, self.val_loader, self.model, self.optimizer
-                )
-            else:
-                self.train_loader, self.model, self.optimizer = accelerator.prepare(self.train_loader, self.model, self.optimizer)
+            # Don't prepare val_loader - keep it non-distributed so each GPU validates on full dataset
+            self.train_loader, self.model, self.optimizer = accelerator.prepare(
+                self.train_loader, self.model, self.optimizer
+            )
 
         # ============== Loss Functions ==============
         if config.out_ref:
