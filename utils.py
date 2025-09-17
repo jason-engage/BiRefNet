@@ -117,6 +117,16 @@ class SimpleMovingAverage:
 
 ########### LOGGING ###########
 
+def checkGradientNorm(model):
+    """Calculate the L2 norm of all gradients in the model."""
+    total_norm = 0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+    return total_norm
+
 from pathlib import Path
 # List of validation images to send to comet ml
 def is_sample_image(file_path):
