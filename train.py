@@ -171,9 +171,9 @@ if resume_weights_path:
                     logger.info(f"Could not extract epoch from filename, using epoch_st={epoch_st} from config")
     else:
         if logger:
-            logger.warning("=" * 60)
-            logger.warning(f"Resume checkpoint '{resume_weights_path}' not found. Starting from scratch.")
-            logger.warning("=" * 60)
+            logger.info("=" * 60)
+            logger.info(f"Resume checkpoint '{resume_weights_path}' not found. Starting from scratch.")
+            logger.info("=" * 60)
         resume_weights_path = None  # Reset to None if file doesn't exist
         
 
