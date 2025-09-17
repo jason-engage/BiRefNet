@@ -200,7 +200,8 @@ if is_main_process:
 
 from dataset import custom_collate_fn, custom_collate_resize_fn
 
-def prepare_train_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be_distributed=False, is_train=True):
+
+def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be_distributed=False, is_train=True):
     # Prepare dataloaders
     sampler = None
 
@@ -265,7 +266,7 @@ def prepare_train_dataloader(dataset: torch.utils.data.Dataset, batch_size: int,
 
 def init_data_loaders(to_be_distributed):
     # Prepare datasets
-    train_loader = prepare_train_dataloader(
+    train_loader = prepare_dataloader(
         MyData(datasets=config.training_set, data_size=None if config.dynamic_size else config.size, is_train=True),
         config.batch_size, to_be_distributed=to_be_distributed, is_train=True
     )
@@ -276,7 +277,7 @@ def init_data_loaders(to_be_distributed):
     val_loader = None
     if config_vars.get('eval_each_epoch', 0) > 0 and config.testsets:
         # Validation should NOT be distributed - each GPU processes full dataset
-        val_loader = prepare_train_dataloader(
+        val_loader = prepare_dataloader(
             MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size, is_train=False),
             config.batch_size_valid, to_be_distributed=False, is_train=False
         )
