@@ -19,8 +19,8 @@ then
     CUDA_VISIBLE_DEVICES=${devices} \
     torchrun --standalone --nproc_per_node $((nproc_per_node+1)) \
     train.py --experiment_name ${experiment_name} \
-        --dist ${to_be_distributed} \
-        --use_accelerate
+        --dist ${to_be_distributed}
+
 else
     echo "Single-GPU mode received..."
     CUDA_VISIBLE_DEVICES=${devices} \
