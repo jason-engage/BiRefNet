@@ -7,7 +7,7 @@ class Config():
         # PATH settings
         # Make up your file system as: SYS_HOME_DIR/codes/dis/BiRefNet, SYS_HOME_DIR/datasets/dis/xx, SYS_HOME_DIR/weights/xx
         self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][1]   # Default, custom
-        self.data_root_dir = os.path.join(self.sys_home_dir, 'data')
+        self.data_root_dir = os.path.join(self.sys_home_dir, 'AI/Training')
 
         # TASK settings
         self.task = ['DIS5K', 'COD', 'HRSOD', '1024px', 'General-2K', 'Matting'][3]
@@ -34,7 +34,7 @@ class Config():
         # Data settings
         self.size = (1024, 1024) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
         # self.dynamic_size = [None, ((384, 768), (384, 768))][1]    # wid, hei. It might cause errors in using compile.
-        self.dynamic_size = [None, [480, 512, 640, 736, 768, 800, 864, 896, 960, 992, 1024]][1]  # List of sizes divisible by 32
+        self.dynamic_size = [None, [480, 512, 640, 736, 768, 800, 864, 896, 960, 992, 1024]][0]  # List of sizes divisible by 32
         self.dynamic_size_batch = 200 # Change the dynamic size every N batches - required to keep it fast enough
 
         # Faster-Training settings
@@ -58,7 +58,7 @@ class Config():
         self.dec_blk = ['BasicDecBlk', 'ResBlk'][0]
 
         # TRAINING settings
-        self.batch_size = 2
+        self.batch_size = 4
         self.finetune_last_epochs = [
             0,
             {

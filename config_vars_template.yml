@@ -2,11 +2,11 @@
 # resume_weights_path: "/path/to/pretrained/model.pth"
 resume_weights_path: null
 resume_start_with_eval: false
-log_frequency: 20
+log_frequency: 100
 eval_each_epoch: 1 # 0 is disabled - otherwise run eval every N epochs
 ckpt_dir: "checkpoints"
 epoch_st: 1
-epochs_end: 200
+epochs_end: 50
 fast_forward_scheduler: false
 max_samples: 0 # 0 means use all samples
 
