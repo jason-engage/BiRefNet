@@ -836,14 +836,10 @@ class Trainer:
                     comet_experiment.set_step(current_step)
 
                 # Data preparation
-                if args.use_accelerate:
-                    inputs = batch[0]
-                    gts = batch[1]
-                    paths = batch[2]  # Validation returns paths as 3rd element
-                else:
-                    inputs = batch[0].to(device)
-                    gts = batch[1].to(device)
-                    paths = batch[2]  # Validation returns paths as 3rd element
+                # Always move validation data to device manually since val_loader is not prepared by accelerator
+                inputs = batch[0].to(device)
+                gts = batch[1].to(device)
+                paths = batch[2]  # Validation returns paths as 3rd element
 
                 # Forward pass
                 scaled_preds = self.model(inputs)[-1]
