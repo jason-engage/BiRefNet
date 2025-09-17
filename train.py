@@ -266,9 +266,16 @@ def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be
 
 def init_data_loaders(to_be_distributed):
     # Prepare datasets
+    # FIX for Accelerate + DDP: When using Accelerate, we must NOT use DistributedSampler
+    # because Accelerate will handle data distribution internally via accelerator.prepare().
+    # Using both would cause double distribution (dividing data by world_size twice).
+    # - If using Accelerate: to_be_distributed should be False (let Accelerate handle it)
+    # - If using pure DDP: to_be_distributed should be True (use DistributedSampler)
+    should_use_distributed_sampler = to_be_distributed and not args.use_accelerate
+
     train_loader = prepare_dataloader(
         MyData(datasets=config.training_set, data_size=None if config.dynamic_size else config.size, is_train=True),
-        config.batch_size, to_be_distributed=to_be_distributed, is_train=True
+        config.batch_size, to_be_distributed=should_use_distributed_sampler, is_train=True
     )
     if is_main_process:
         logger.info("{} batches of train dataloader {} have been created.".format(len(train_loader), config.training_set))
@@ -276,7 +283,8 @@ def init_data_loaders(to_be_distributed):
     # Prepare validation loader if needed
     val_loader = None
     if config_vars.get('eval_each_epoch', 0) > 0 and config.testsets:
-        # Validation should NOT be distributed - each GPU processes full dataset
+        # Validation should NEVER be distributed - each GPU processes full dataset
+        # This applies regardless of whether we're using Accelerate or pure DDP
         val_loader = prepare_dataloader(
             MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size, is_train=False),
             config.batch_size_valid, to_be_distributed=False, is_train=False
