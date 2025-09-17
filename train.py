@@ -59,14 +59,28 @@ except FileNotFoundError:
     sys.exit(1)
 
 # ============== Initialize DDP ==============
-to_be_distributed = args.dist
+# FIX for Accelerate + DDP conflict: Don't initialize DDP process group when using Accelerate
+# Accelerate manages its own process groups and initialization. Calling init_process_group
+# when using Accelerate causes conflicts where DataLoaders auto-shard even when not intended.
+# This was causing validation data to be split across GPUs even with to_be_distributed=False.
+to_be_distributed = args.dist and not args.use_accelerate
+
 if to_be_distributed:
+    # Only initialize DDP if NOT using Accelerate
     init_process_group(backend="nccl", timeout=datetime.timedelta(seconds=3600*10))
     device = int(os.environ["LOCAL_RANK"])
     rank = dist.get_rank()
     world_size = dist.get_world_size()
     is_main_process = (rank == 0)
+elif args.use_accelerate and args.dist:
+    # When using Accelerate with multi-GPU, let Accelerate handle device and rank
+    # These will be properly set after Accelerator initialization
+    device = int(os.environ.get("LOCAL_RANK", 0))
+    rank = int(os.environ.get("RANK", 0))
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+    is_main_process = (rank == 0)
 else:
+    # Single GPU mode (no distribution)
     device = config.device
     rank = 0
     world_size = 1

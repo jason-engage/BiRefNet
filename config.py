@@ -58,7 +58,7 @@ class Config():
         self.dec_blk = ['BasicDecBlk', 'ResBlk'][0]
 
         # TRAINING settings
-        self.batch_size = 2
+        self.batch_size = 2  # Never set to 1!!! > 1 is required even for DDP
         self.finetune_last_epochs = [
             0,
             {
