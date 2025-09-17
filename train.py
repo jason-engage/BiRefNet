@@ -231,12 +231,13 @@ def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be
         # Adjust for multi-GPU if using DDP
         if to_be_distributed:
             world_size = dist.get_world_size()
-            num_samples = num_samples // world_size
-            # Create subset indices and use with DistributedSampler
-            indices = list(range(min(num_samples * world_size, total_size)))
-            sampler = DistributedSampler(torch.utils.data.Subset(dataset, indices))
-            # Update dataset to subset
+            # For DDP, we want total of 'desired_samples' across all GPUs
+            # So don't divide by world_size here - DistributedSampler will handle the split
+            indices = list(range(min(desired_samples, total_size)))
+            # Create subset dataset
             dataset = torch.utils.data.Subset(dataset, indices)
+            # Let DistributedSampler handle the per-GPU splitting
+            sampler = DistributedSampler(dataset)
         else:
             # Single GPU - just limit the indices
             indices = list(range(min(num_samples, total_size)))
@@ -251,8 +252,12 @@ def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be
             logger.info(f"{'='*60}")
             logger.info(f"  Total available samples:  {total_size:,}")
             logger.info(f"  Desired samples:          {desired_samples:,}")
-            logger.info(f"  Adjusted total samples:   {num_samples * (dist.get_world_size() if to_be_distributed else 1):,}")
-            logger.info(f"  Samples per GPU:          {num_samples:,}")
+            if to_be_distributed:
+                samples_per_gpu = len(indices) // dist.get_world_size()
+                logger.info(f"  Adjusted total samples:   {len(indices):,}")
+                logger.info(f"  Samples per GPU (approx): {samples_per_gpu:,}")
+            else:
+                logger.info(f"  Samples to use:           {len(indices):,}")
             logger.info(f"  Batch size:               {batch_size}")
             logger.info(f"{'='*60}\n")
     elif to_be_distributed:
@@ -282,9 +287,10 @@ def init_data_loaders(to_be_distributed):
     # Prepare validation loader if needed
     val_loader = None
     if config_vars.get('eval_each_epoch', 0) > 0 and config.testsets:
+        # Validation should NOT be distributed - each GPU processes full dataset
         val_loader = prepare_dataloader(
             MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size, is_train=False),
-            config.batch_size_valid, to_be_distributed=to_be_distributed, is_train=False
+            config.batch_size_valid, to_be_distributed=False, is_train=False
         )
         if is_main_process:
             logger.info("{} batches of validation dataloader {} have been created.".format(len(val_loader), config.testsets))
@@ -333,13 +339,31 @@ def init_models_optimizers(epochs, to_be_distributed):
         torch.set_float32_matmul_precision('high')
 
     # ============== OPTIMIZER ==============
+
+    # Scale learning rate based on batch size and number of GPUs
+    # Original config.py had: sqrt(batch_size/4) scaling
+    batch_scale = math.sqrt(config.batch_size / 4)
+
+    # Scale for multi-GPU training
+    if to_be_distributed:
+        gpu_scale = math.sqrt(world_size)
+    else:
+        gpu_scale = 1.0
+
+    # Apply both scaling factors
+    scaled_lr = config.lr * batch_scale * gpu_scale
+
+    # Log the scaling factors for debugging
+    if is_main_process:
+        logger.info(f"LR Scaling: base_lr={config.lr:.2e}, batch_scale={batch_scale:.3f}, gpu_scale={gpu_scale:.3f}, final_lr={scaled_lr:.2e}")
+
     if config.optimizer == 'AdamW':
-        optimizer = optim.AdamW(params=model.parameters(), lr=config.lr, weight_decay=1e-2)
+        optimizer = optim.AdamW(params=model.parameters(), lr=scaled_lr, weight_decay=1e-2)
     elif config.optimizer == 'Adam':
-        optimizer = optim.Adam(params=model.parameters(), lr=config.lr, weight_decay=0)
+        optimizer = optim.Adam(params=model.parameters(), lr=scaled_lr, weight_decay=0)
     elif config.optimizer == 'Ranger':
-        import torch_optimizer as optim_extra        
-        optimizer = optim_extra.Ranger(params=model.parameters(), lr=config.lr, weight_decay=1e-2)
+        import torch_optimizer as optim_extra
+        optimizer = optim_extra.Ranger(params=model.parameters(), lr=scaled_lr, weight_decay=1e-2)
 	
 	# ============== LR SCHEDULER ==============
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(

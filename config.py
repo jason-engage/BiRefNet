@@ -70,7 +70,7 @@ class Config():
                 'Matting': -10,
             }[self.task]
         ][1]    # choose 0 to skip
-        self.lr = (1e-4 if 'DIS5K' in self.task else 1e-5) * math.sqrt(self.batch_size / 4)     # DIS needs high lr to converge faster. Adapt the lr linearly
+        self.lr = (1e-4 if 'DIS5K' in self.task else 1e-5)  # DIS needs high lr to converge faster. Adapt the lr linearly
         self.num_workers = max(4, self.batch_size)          # will be decrease to min(it, batch_size) at the initialization of the data_loader
 
         # Backbone settings
@@ -111,7 +111,7 @@ class Config():
         self.preproc_methods = ['flip', 'enhance', 'random_rotate_zoom', 'pepper', 'crop'][:4]
         self.optimizer = ['Adam', 'AdamW', 'Ranger'][1]
         self.lr_decay_epochs = [1e5]    # Set to negative N to decay the lr in the last N-th epoch.
-        self.lr_decay_rate = 0.5
+        self.lr_decay_rate = 0.5 
         # Loss
         if self.task in ['Matting']:
             self.lambdas_pix_last = {
