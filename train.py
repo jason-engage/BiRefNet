@@ -1,3 +1,4 @@
+from ast import arg
 import os
 import datetime
 from contextlib import nullcontext
@@ -37,6 +38,7 @@ parser.add_argument('--dist', default=False, type=lambda x: x == 'True')
 parser.add_argument('--use_accelerate', action='store_true', help='`accelerate launch --multi_gpu train.py --use_accelerate`. Use accelerate for training, good for FP16/BF16/...')
 parser.add_argument('--mode', default='train', choices=['train', 'validate'], help='Run mode: train (default) or validate')
 parser.add_argument('--validate_checkpoint', type=str, default=None, help='Checkpoint path for validation mode')
+parser.add_argument('--comet', action='store_true', help='Enable Comet ML for validation mode')
 args = parser.parse_args()
 
 # ============== Load config variables ==============
@@ -63,9 +65,12 @@ except FileNotFoundError:
 # ============== Override config for validation mode ==============
 if args.mode == 'validate':
     if args.validate_checkpoint:
-        config_vars['resume_weights_path'] = args.validate_checkpoint
+        config_vars['resume_weights_path'] = None
         config_vars['resume_start_with_eval'] = False  # Don't eval twice in validation mode
         config_vars['epochs_end'] = 0  # No training epochs
+        # Override Comet ML setting if --comet flag is provided
+        if args.comet:
+            config_vars['comet_ml_enable'] = True
     else:
         print("Error: --validate_checkpoint required when using --mode validate")
         import sys
@@ -113,8 +118,12 @@ if config_vars.get('comet_ml_enable', False) and is_main_process:
             auto_param_logging=False,
             auto_metric_logging=False,
         )
-        # Update This Later
-        # comet_experiment.set_name(f"BiRefNet_{config.task}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+        # Only set the name explicitly when validating
+        if args.mode == 'validate':
+            comet_experiment.set_name(f"{experiment_name}")
+        else:
+            experiment_name = comet_experiment.get_name().rsplit('_', 1)[0] # Overwrites experiment_name
 
         # comet_experiment.log_parameters({
         #     "model": config.model,
@@ -127,7 +136,7 @@ if config_vars.get('comet_ml_enable', False) and is_main_process:
         #     "mixed_precision": config.mixed_precision if args.use_accelerate else "none",
         # })
 
-        experiment_name = comet_experiment.get_name().rsplit('_', 1)[0] # Overwrites experiment_name
+        
         comet_experiment_epoch = 0 # Will be incremented before training
         
         print("=" * 60)
@@ -952,7 +961,7 @@ class Trainer:
 
                     # Check if this image is in our sample list
                     if is_sample_image(Path(file_path).stem):
-                        # On first epoch, log the ground truth
+                        # On first epoch, log the ground truth - This is to easily compare against predictions - visual benefit only
                         if epoch == 1 and config_vars.get('resume_start_with_eval', False) is False:
                             comet_experiment.log_image(
                                 gts.squeeze().cpu(),
