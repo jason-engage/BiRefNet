@@ -1,6 +1,6 @@
-# BiRefNet Training Enhanced
+# Enhanced BiRefNet Training Pipeline
 
-> **Enhanced training pipeline for [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) with comprehensive monitoring, logging, and experiment tracking**
+> **Comprehensive monitoring, logging, and experiment tracking**
 
 ## 🚀 Training Enhancements
 
