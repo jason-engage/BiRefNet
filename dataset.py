@@ -193,7 +193,7 @@ def custom_collate_resize_fn(batch):
             chosen_width = random.choice(config.dynamic_size)
             chosen_height = random.choice(config.dynamic_size)
             custom_collate_resize_fn.current_size = (chosen_width, chosen_height)
-            print(f"[Dynamic Size] Changing to new size: {custom_collate_resize_fn.current_size} at batch {custom_collate_resize_fn.batch_counter}")
+            # print(f"[Dynamic Size] Changing to new size: {custom_collate_resize_fn.current_size} at batch {custom_collate_resize_fn.batch_counter}")
 
         custom_collate_resize_fn.batch_counter += 1
         data_size = custom_collate_resize_fn.current_size

@@ -35,6 +35,8 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument('--experiment_name', default='BiRefNet', type=str, help='Name for this experiment/training run')
 parser.add_argument('--dist', default=False, type=lambda x: x == 'True')
 parser.add_argument('--use_accelerate', action='store_true', help='`accelerate launch --multi_gpu train.py --use_accelerate`. Use accelerate for training, good for FP16/BF16/...')
+parser.add_argument('--mode', default='train', choices=['train', 'validate'], help='Run mode: train (default) or validate')
+parser.add_argument('--validate_checkpoint', type=str, default=None, help='Checkpoint path for validation mode')
 args = parser.parse_args()
 
 # ============== Load config variables ==============
@@ -57,6 +59,17 @@ except FileNotFoundError:
 
     import sys
     sys.exit(1)
+
+# ============== Override config for validation mode ==============
+if args.mode == 'validate':
+    if args.validate_checkpoint:
+        config_vars['resume_weights_path'] = args.validate_checkpoint
+        config_vars['resume_start_with_eval'] = False  # Don't eval twice in validation mode
+        config_vars['epochs_end'] = 0  # No training epochs
+    else:
+        print("Error: --validate_checkpoint required when using --mode validate")
+        import sys
+        sys.exit(1)
 
 # ============== Initialize DDP ==============
 # FIX for Accelerate + DDP conflict: Don't initialize DDP process group when using Accelerate
@@ -211,9 +224,11 @@ if is_main_process:
         logger.info(f"  {key}: {value}")
     logger.info(f"  batch size: {config.batch_size}")
     logger.info(f"  experiment name: {experiment_name}")
+    logger.info(f"  optimizer: {config.optimizer}")
 
+
+# ============== Data loaders ==============
 from dataset import custom_collate_fn, custom_collate_resize_fn
-
 
 def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be_distributed=False, is_train=True):
     # Prepare dataloaders
@@ -300,7 +315,7 @@ def init_data_loaders(to_be_distributed):
         # Validation should NEVER be distributed - each GPU processes full dataset
         # This applies regardless of whether we're using Accelerate or pure DDP
         val_loader = prepare_dataloader(
-            MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size, is_train=False),
+            MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size_val, is_train=False),
             config.batch_size_valid, to_be_distributed=False, is_train=False
         )
         if is_main_process:
@@ -308,8 +323,12 @@ def init_data_loaders(to_be_distributed):
 
     return train_loader, val_loader
 
+# ============== Load Model And Optimizer ==============
 
 def init_models_optimizers(epochs, to_be_distributed):
+    
+    # ============== LOAD MODEL ==============
+
     # Init models
     # Only use pretrained backbone if NOT resuming from checkpoint
     use_bb_pretrained = (resume_weights_path is None)
@@ -349,9 +368,9 @@ def init_models_optimizers(epochs, to_be_distributed):
     if config.precisionHigh:
         torch.set_float32_matmul_precision('high')
 
-    # ============== OPTIMIZER ==============
+    # ============== LOAD OPTIMIZER ==============
 
-    # Scale learning rate based on batch size and number of GPUs
+    # Scale learning rate based on batch size and number of GPUs (global batch size)
     # Original config.py had: sqrt(batch_size/4) scaling
     batch_scale = math.sqrt(config.batch_size / 4)
 
@@ -612,6 +631,10 @@ class Trainer:
         """
         Train for one epoch with comprehensive metrics display
         """
+        # Skip training if in validation-only mode (no optimizer)
+        if self.optimizer is None:
+            return 0.0
+
         global logger_loss_idx, comet_experiment
         self.model.train()
         self.loss_dict = {}
@@ -777,12 +800,35 @@ class Trainer:
                            f"Dice: {self.train_dice_total/self.logged_steps_count:.4f}, "
                            f"Jaccard: {self.train_jaccard_total/self.logged_steps_count:.4f}, "
                            f"SSIM: {self.train_ssim_total/self.logged_steps_count:.4f}")
-            logger.info(f"  Performance Distribution - Red: {self.red_count}, Green: {self.green_count}, Yellow: {self.yellow_count}, Blue: {self.blue_count}")
-            if self.epoch_composition_totals:
-                comp_summary = ", ".join([f"{k}: {v}" for k, v in sorted(self.epoch_composition_totals.items())])
-                logger.info(f"  Dataset Composition: {comp_summary}")
             logger.info(f"  Epoch Time: {datetime.timedelta(seconds=int(epoch_time))}")
             logger.info(f"{'='*80}\n")
+
+            # Performance Distribution Bar Graph
+            logger.info(f"📊 PERFORMANCE DISTRIBUTION:")
+            logger.info(f"{'-'*40}")
+            perf_counts = {
+                'Red (JI<0.95)': self.red_count,
+                'Blue (Normal)': self.blue_count,
+                'Green (BCE>0.999)': self.green_count,
+                'Cyan (BCE>0.999 & DI>0.985)': self.yellow_count
+            }
+            max_perf_count = max(perf_counts.values()) if perf_counts.values() else 1
+            for label, count in perf_counts.items():
+                if count > 0:
+                    bar = '█' * min(50, int(count * 50 / max_perf_count))
+                    logger.info(f"  {label:30}: {bar} {count}")
+            logger.info(f"{'='*80}\n")
+
+            # Dataset Composition Bar Graph
+            if self.epoch_composition_totals:
+                logger.info(f"📈 DATASET COMPOSITION:")
+                logger.info(f"{'-'*40}")
+                max_comp_count = max(self.epoch_composition_totals.values()) if self.epoch_composition_totals.values() else 1
+                for dataset, count in sorted(self.epoch_composition_totals.items()):
+                    if count > 0:
+                        bar = '█' * min(50, int(count * 50 / max_comp_count))
+                        logger.info(f"  {dataset:20}: {bar} {count}")
+                logger.info(f"{'='*80}\n")
 
             # Log epoch summary to Comet
             if comet_experiment is not None:
@@ -799,7 +845,9 @@ class Trainer:
                 comet_experiment.log_metric("dice_high", self.yellow_count)
                 comet_experiment.log_metric("jaccard_low", self.red_count)
                 
-        self.lr_scheduler.step()
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
+            
         return self.loss_log.avg
 
 	# ============================================================
@@ -960,7 +1008,7 @@ class Trainer:
             logger.info(f"{'='*80}\n")
 
             # Overall metrics
-            logger.info(f"📊 OVERALL METRICS:")
+            logger.info(f"📊 AVERAGE METRICS:")
             logger.info(f"{'-'*40}")
             logger.info(f"  Loss:         {val_loss_avg:.5g}")
             logger.info(f"  BCE:          {val_bce_avg:.4f}")
@@ -1027,6 +1075,68 @@ class Trainer:
 def main():
     global comet_experiment_epoch
 
+    # ============== Validation-only mode ==============
+    if args.mode == 'validate':
+        # Allow CPU fallback for validation mode only
+        # This enables validation on machines without GPUs (useful for testing/debugging)
+        # Training still requires GPU and will crash if CUDA unavailable (as intended)
+        if not torch.cuda.is_available():
+            global device
+            device = 'cpu'
+            if is_main_process:
+                logger.info("CUDA not available - using CPU for validation")
+
+        if is_main_process:
+            logger.info("="*80)
+            logger.info("VALIDATION-ONLY MODE")
+            logger.info(f"Checkpoint: {args.validate_checkpoint}")
+            logger.info(f"Device: {device}")
+            logger.info("="*80 + "\n")
+
+        # Create validation dataloader only
+        val_loader = prepare_dataloader(
+            MyData(datasets=config.testsets.replace(',', '+'), data_size=config.size_val, is_train=False),
+            config.batch_size_valid, to_be_distributed=False, is_train=False
+        )
+
+        # Load model without optimizer
+        if config.model == 'BiRefNet':
+            model = BiRefNet(bb_pretrained=False)
+        elif config.model == 'BiRefNetC2F':
+            model = BiRefNetC2F(bb_pretrained=False)
+
+        # Load checkpoint
+        if args.validate_checkpoint.endswith('.bin'):
+            state_dict = torch.load(args.validate_checkpoint, map_location='cpu', weights_only=True)
+            model.load_state_dict(state_dict, strict=False)
+        else:
+            state_dict = torch.load(args.validate_checkpoint, map_location='cpu', weights_only=True)
+            state_dict = check_state_dict(state_dict)
+            model.load_state_dict(state_dict)
+
+        model = model.to(device)
+        model.eval()
+
+        # Create minimal trainer for validation
+        trainer = Trainer(
+            data_loaders=(None, val_loader),
+            model_opt_lrsch=(model, None, None)
+        )
+
+        # Run validation
+        val_metric = trainer.validate_epoch(0)  # Use epoch 0 for standalone validation
+
+        if is_main_process:
+            logger.info("="*80)
+            logger.info(f"VALIDATION COMPLETE - Final Jaccard: {val_metric:.4f}")
+            logger.info("="*80 + "\n")
+
+        if to_be_distributed:
+            destroy_process_group()
+
+        return  # Exit without training
+
+    # ============== Normal training mode ==============
     trainer = Trainer(
         data_loaders=init_data_loaders(to_be_distributed),
         model_opt_lrsch=init_models_optimizers(epochs_end, to_be_distributed)

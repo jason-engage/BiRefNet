@@ -6,7 +6,7 @@ class Config():
     def __init__(self) -> None:
         # PATH settings
         # Make up your file system as: SYS_HOME_DIR/codes/dis/BiRefNet, SYS_HOME_DIR/datasets/dis/xx, SYS_HOME_DIR/weights/xx
-        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][1]   # Default, custom
+        self.sys_home_dir = [os.path.expanduser('~'), '/workspace'][0]   # Default, custom
         self.data_root_dir = os.path.join(self.sys_home_dir, 'AI/Training')
 
         # TASK settings
@@ -33,6 +33,7 @@ class Config():
 
         # Data settings
         self.size = (768, 768) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
+        self.size_val = (1024, 1024)  # Validation image size. Set to None to skip resizing (processes at original resolution)
         # self.dynamic_size = [None, ((384, 768), (384, 768))][1]    # wid, hei. It might cause errors in using compile.
         self.dynamic_size = [None, [480, 512, 640, 736, 768, 800, 864, 896, 960, 992, 1024]][0]  # List of sizes divisible by 32
         self.dynamic_size_batch = 200 # Change the dynamic size every N batches - required to keep it fast enough
@@ -58,8 +59,8 @@ class Config():
         self.dec_blk = ['BasicDecBlk', 'ResBlk'][0]
 
         # TRAINING settings
-        self.batch_size = 2  # Never set to 1!!! > 1 is required even for DDP
-        self.finetune_last_epochs = [
+        self.batch_size = 2  # Setting to 1 causes issues... However it may not yet be ruled out when resuming training with DDP. (ie 1 batch per GPU)
+        self.finetune_last_epochs = [ # Refers to the last N epochs. ONLY adjusting the loss function weights. Nothing else changes - same learning rate, same optimizer, same model architecture. Just the loss weights get modified for fine-tuning in those final epochs
             0,
             {
                 'DIS5K': -40,
