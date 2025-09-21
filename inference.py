@@ -24,7 +24,6 @@ else:
 
 autocast_ctx = torch.amp.autocast(device_type='cuda', dtype=mixed_dtype) if mixed_dtype else nullcontext()
 
-
 def inference(model, data_loader_test, pred_root, method, testset, device=0):
     model_training = model.training
     if model_training:
