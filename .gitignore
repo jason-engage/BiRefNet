@@ -157,3 +157,4 @@ config_vars.yml
 .claude
 checkpoints
 scripts
+masks
