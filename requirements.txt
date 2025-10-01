@@ -19,3 +19,6 @@ colorama
 comet_ml
 matplotlib
 torch-optimizer
+
+# Note: RealESRGAN module should be copied to project root directory
+# (not installed via pip)

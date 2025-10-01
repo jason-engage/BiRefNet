@@ -16,3 +16,8 @@ comet_ml_enable: false
 comet_ml_api_key: "YOUR_COMET_API_KEY_HERE"  # Get from https://www.comet.com/api/my/settings
 comet_ml_workspace: "YOUR_WORKSPACE_NAME"     # Your Comet ML workspace
 comet_ml_project_name: "birefnet"
+
+# Upscaling Configuration (for inference_upscale.py)
+# Path to RealESRGAN model weights (x2 or x4)
+# Download from: https://github.com/ai-forever/Real-ESRGAN
+upscale_model_path: "weights/RealESRGAN_x2.pth"  # or RealESRGAN_x4.pth

@@ -753,7 +753,7 @@ class Trainer:
                 display_msg = (
                     f"{self.back_color}E{epoch} - {current_batch}/{total_batches} - "
                     f"L: {train_loss_avg:.3f}, LB: {self.train_loss_batch:.3f}, "
-                    f"BC: {train_bce_avg:.3f}, BCB: {curr_bce:.3f}, "
+                    f"BCE: {train_bce_avg:.3f}, BCEB: {curr_bce:.3f}, "
                     f"DI: {train_dice_avg:.3f}, DIB: {curr_dice:.3f}, "
                     f"JI: {train_jaccard_avg:.3f}, JIB: {curr_jaccard:.3f}, "
                     f"SI: {train_ssim_avg:.3f}, SIB: {curr_ssim:.3f}, "
@@ -1184,15 +1184,15 @@ def main():
 
         # 4) Saving Checkpoint
         if epoch >= epochs_end - config.save_last and epoch % config.save_step == 0:
-            if args.use_accelerate:
-                state_dict = trainer.model.state_dict()
-            else:
-                state_dict = trainer.model.module.state_dict() if to_be_distributed else trainer.model.state_dict()
-            checkpoint_filename = '{}_epoch_{}.pth'.format(experiment_name, epoch)
-            checkpoint_path = os.path.join(ckpt_dir, checkpoint_filename)
-            torch.save(state_dict, checkpoint_path)
-
             if is_main_process:
+                if args.use_accelerate:
+                    state_dict = trainer.model.state_dict()
+                else:
+                    state_dict = trainer.model.module.state_dict() if to_be_distributed else trainer.model.state_dict()
+                checkpoint_filename = '{}_epoch_{}.pth'.format(experiment_name, epoch)
+                checkpoint_path = os.path.join(ckpt_dir, checkpoint_filename)
+                torch.save(state_dict, checkpoint_path)
+
                 logger.info(f"{'='*80}")
                 logger.info(f"💾 CHECKPOINT SAVED")
                 logger.info(f"  Path: {checkpoint_path}")

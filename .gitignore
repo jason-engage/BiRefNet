@@ -158,3 +158,5 @@ config_vars.yml
 checkpoints
 scripts
 masks
+tests
+images

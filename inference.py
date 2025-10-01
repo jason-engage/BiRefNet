@@ -22,7 +22,8 @@ elif mixed_precision == 'bf16':
 else:
     mixed_dtype = None
 
-autocast_ctx = torch.amp.autocast(device_type='cuda', dtype=mixed_dtype) if mixed_dtype else nullcontext()
+device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=mixed_dtype) if mixed_dtype and device_type == 'cuda' else nullcontext()
 
 def inference(model, data_loader_test, pred_root, method, testset, device=0):
     model_training = model.training
@@ -50,7 +51,12 @@ def inference(model, data_loader_test, pred_root, method, testset, device=0):
 
 
 def main(args):
-    device = config.device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if device.type == 'cpu':
+        print('CUDA not available, using CPU for inference')
+    else:
+        print(f'Using CUDA device: {torch.cuda.get_device_name(0)}')
+    
     if args.ckpt_folder:
         print('Testing with models in {}'.format(args.ckpt_folder))
     else:
@@ -95,7 +101,7 @@ def main(args):
             inference(
                 model, data_loader_test=data_loader_test, pred_root=args.pred_root,
                 method='--'.join([w.rstrip('.pth') for w in weights.split(os.sep)[-2:]]) + '-reso_{}'.format('x'.join([str(s) for s in data_size])),
-                testset=testset, device=config.device
+                testset=testset, device=device
             )
 
 
