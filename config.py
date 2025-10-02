@@ -32,8 +32,8 @@ class Config():
         }[self.task]
 
         # Data settings
-        self.size = (1024, 1024) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
-        self.size_val = (1024, 1024)  # Validation image size. Set to None to skip resizing (processes at original resolution)
+        self.size = (1280, 1280) if self.task not in ['General-2K'] else (2560, 1440)   # wid, hei. Can be overwritten by dynamic_size in training.
+        self.size_val = (1600, 1600)  # Validation image size. Set to None to skip resizing (processes at original resolution)
         # self.dynamic_size = [None, ((384, 768), (384, 768))][1]    # wid, hei. It might cause errors in using compile.
         self.dynamic_size = [None, [480, 512, 640, 768, 800, 896, 960, 1024, 1088, 1152, 1216, 1280]][0]  # List of sizes divisible by 32
         self.dynamic_size_batch = 200 # Change the dynamic size every N batches - required to keep it fast enough

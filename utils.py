@@ -218,7 +218,8 @@ def is_sample_image(file_path):
         'product-image-1964830374',
         'Sa358edda953b48ef8797c22814f764bct',
         'Sf587b366298d43a09ed9115f8168c890W',
-        'twotwinstyle-womens-oversized-cutout-lapel-jacket-2022-winter-fashion-533347'
+        'twotwinstyle-womens-oversized-cutout-lapel-jacket-2022-winter-fashion-533347',
+        'necessairefemininaluxostand19-1-66c3502a20eff'
     ]
 
     file_name = Path(file_path).name
