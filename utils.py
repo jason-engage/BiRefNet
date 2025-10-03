@@ -134,7 +134,7 @@ from pathlib import Path
 def is_sample_image(file_path):
     file_list = [
         '0ac4c733-e803-42ca-aa76-edc3aa0b108c1675064255462-ETC-Women-Night-suits-2691675064254924-5',
-        '0AFDB91F-87C2-4C84-820D-5B3ACF4EC4DD',
+        #'0AFDB91F-87C2-4C84-820D-5B3ACF4EC4DD',
         '0c8ec50f2b6a47d35a6a29643c9c3efe',
         '1_46bd718f-da4b-4b47-9266-760ccbc6fa5d',
         '2nfkX2',
@@ -155,16 +155,16 @@ def is_sample_image(file_path):
         'H47751bad62754aaca36ad5f1be48c15dn',
         # 'Hfc26b0880a4f40d49ae5745f7dcabf35L',
         # 'HTB1EiktXrj1gK0jSZFuq6ArHpXaE',
-        'HTB1KyhbEv9TBuNjy1zbq6xpepXaU',
+        # 'HTB1KyhbEv9TBuNjy1zbq6xpepXaU',
         # 'IMG_2201-5eff5ff1eff82',
-        'IMG_10722',
-        'IMG_20210125_093811_resized_20210125_094015285',
+        # 'IMG_10722',
+        #'IMG_20210125_093811_resized_20210125_094015285',
         'mc_BPJtWbJzi',
         'mc_Jig1lwHrJ',
         'mc_nqyoVAYt2',
         # 'new-era-food-burger-white-t-shirt-60416411-center',
-        'top-focoss-fitness-cod089-ref089-focoss-747470',
-        '2ceea7e7af5b4329823c0d967288dd8b-max-6738cb9642c28',
+        #'top-focoss-fitness-cod089-ref089-focoss-747470',
+        #'2ceea7e7af5b4329823c0d967288dd8b-max-6738cb9642c28',
         '3b5f3cad39e336da560651a419f1e5c4',
         'HS_Charme4_Champagne_Rooted_2017',
         'h36e087bbc2e8499bb7322928bd2ee076p-66c3dbcc3bdb0',
@@ -178,7 +178,7 @@ def is_sample_image(file_path):
         'product-image-1712332648',
         'SweetTalk',
         'Zappelin-4',
-        'mc__lvEkSwWx', # veryhard
+        #'mc__lvEkSwWx', # veryhard
         'S37acc11f67424e99a089818fa2b5d12bq', # veryhard
         'gxu3exsdtbq5-kgnxlkqhw-bmasmkw5eeii-x7sruokzg-90485-672c6d724d3fc', # veryhard
         'H45a9945126874501b99b16283bd66fc9r', # veryhard
@@ -188,10 +188,10 @@ def is_sample_image(file_path):
         'clown-necklace-4',
         'heavy-bulldog-silver-bracelet-4',
         'mc_3p4sorken',
-        'tropical-bag-in-ecru-beach-bags',
+        #'tropical-bag-in-ecru-beach-bags',
         'cuban-chain-necklace-3',
         '14A8322E-11A9-4B5B-AA05-468E83FEDFAB',
-        'main_images__2_61b74325-aab0-4904-96ea-889b96368c0d',
+        #'main_images__2_61b74325-aab0-4904-96ea-889b96368c0d',
         '8c6b480fba2011541c240662cd99f37f',
         '8e6667f14a2ccf61de54397a4a61a51e',
         '27',
@@ -219,7 +219,11 @@ def is_sample_image(file_path):
         'Sa358edda953b48ef8797c22814f764bct',
         'Sf587b366298d43a09ed9115f8168c890W',
         'twotwinstyle-womens-oversized-cutout-lapel-jacket-2022-winter-fashion-533347',
-        'necessairefemininaluxostand19-1-66c3502a20eff'
+        'necessairefemininaluxostand19-1-66c3502a20eff',
+        '9b618fa0-e9bc-429e-8256-fefc46a258e4',
+        'chrome-diopside-gemstone-handmade-gift-jewelry-earring-256-t264-639591',
+        'IMG_7018'
+
     ]
 
     file_name = Path(file_path).name
